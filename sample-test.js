@@ -26,7 +26,7 @@ describe("POCP ROLES:", function () {
     assert.notEqual(await pocp.hasRole(PAUSER_ROLE, add1.address), true);
     assert.notEqual(await pocp.hasRole(UPGRADER_ROLE, add1.address), true);
   });
-  it("should  check for Pausable and upgradable roles:", async() =>{
+  it("Should check each function:", async() =>{
     console.log("Owner address is :",owner.address);
     expect(await pocp.hasRole(PAUSER_ROLE,owner.address)).to.equal(true);
     expect(await pocp.hasRole(UPGRADER_ROLE, owner.address)).to.equal(true);
@@ -72,5 +72,10 @@ describe("POCP ROLES:", function () {
     await pocp.revokeRole(PAUSER_ROLE, add2.address);
 
     assert.equal(await pocp.hasRole(PAUSER_ROLE, add2.address), false);
+
+    console.log("Checking again for address 1 in pausabe role");
+    assert.equal(await pocp.hasRole(PAUSER_ROLE, add1.address), false);
+
+    console.log("SUCCESS!");
   });
 });
