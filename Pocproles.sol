@@ -1,90 +1,64 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.2;
+import "hardhat/console.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 contract POCPRoles is Initializable, AccessControlUpgradeable {
-    event ApproverAdded(bytes32 indexed daoId, address indexed account);
-    event ApproverRemoved(bytes32 indexed daoId, address indexed account);
-    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
-    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
-    
-    // mapping dao id -> {role_id -> role_data }
-    mapping(bytes32 => RoleData) private _approvers;
+  event ApproverAdded(bytes32 indexed daoId, address indexed account);
+  event ApproverRemoved(bytes32 indexed daoId, address indexed account);
+  bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+  bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
-    function initialize() initializer public {
-        __AccessControl_init();
-        _setRoleAdmin(PAUSER_ROLE, PAUSER_ROLE);
-        _setRoleAdmin(UPGRADER_ROLE, UPGRADER_ROLE);
-        _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
-        _grantRole(PAUSER_ROLE, _msgSender());
-        _grantRole(UPGRADER_ROLE, _msgSender());
-    }
+  // mapping dao id -> {role_id -> role_data }
+  mapping(bytes32 => RoleData) private _approvers;
 
-    function hasRole(bytes32 role, address account) public view  override returns (bool) {
-        return _approvers[role].members[account];
-    }
+  function __POCPRoles_init() public initializer {
+    __AccessControl_init();
+    _addApprover(DEFAULT_ADMIN_ROLE, _msgSender());
+    _addApprover(PAUSER_ROLE, _msgSender());
+    _addApprover(UPGRADER_ROLE, _msgSender());
+  }
 
-    function _checkRole(bytes32 role) internal view  {
-        _checkRole(role, _msgSender());
-    }
+  modifier onlyApprover(bytes32 daoUuid, address account) {
+    require(isApprover(daoUuid, account), "Not Approver");
+    _;
+  }
 
-    function _checkRole(bytes32 role, address account) internal override view  {
-        if (!hasRole(role, account)) {
-            revert(
-                string(
-                    abi.encodePacked(
-                        "AccessControl: account ",
-                        StringsUpgradeable.toHexString(uint160(account), 20),
-                        " is missing role ",
-                        StringsUpgradeable.toHexString(uint256(role), 32)
-                    )
-                )
-            );
+  function isApprover(bytes32 daoUuid, address account) public view returns (bool) {
+    return _approvers[daoUuid].members[account];
+  }
+
+  function addApprover(bytes32 daoUuid, address account) public onlyApprover(daoUuid, _msgSender()) {
+    _addApprover(daoUuid, account);
+  }
+
+  function _addApprover(bytes32 daoUuid, address account) internal  {
+        if (!isApprover(daoUuid, account)) {
+            _approvers[daoUuid].members[account] = true;
+            emit RoleGranted(daoUuid, account, _msgSender());
         }
-    }
+  }
+  function removeApprover(bytes32 daoUuid, address account) public onlyApprover(daoUuid, _msgSender()) {
+    _removeApprover(daoUuid, account);
+  }
 
-    function getRoleAdmin(bytes32 role) public view  override returns (bytes32) {
-        return _approvers[role].adminRole;
+  function _removeApprover(bytes32 daoUuid, address account)  internal  {
+    if (isApprover(daoUuid, account)) {
+        _approvers[daoUuid].members[account] = false;
+        emit ApproverRemoved(daoUuid, account);
     }
+  }
 
-    function grantRole(bytes32 role, address account) public  override onlyRole(getRoleAdmin(role)) {
-        _grantRole(role, account);
-    }
+  function getRoleAdmin(bytes32 daoUuid) public view  override returns (bytes32) {
+      return _approvers[daoUuid].adminRole;
+  }
 
-    function revokeRole(bytes32 role, address account) public  override onlyRole(getRoleAdmin(role)) {
-        _revokeRole(role, account);
-    }
-
-    function renounceRole(bytes32 role, address account) public  override {
-        require(account == _msgSender(), "AccessControl: can only renounce roles for self");
-
-        _revokeRole(role, account);
-    }
-
-    function _setupRole(bytes32 role, address account) override internal  {
-        _grantRole(role, account);
-    }
-
-    function _setRoleAdmin(bytes32 role, bytes32 adminRole)  override internal  {
-        bytes32 previousAdminRole = getRoleAdmin(role);
-        _approvers[role].adminRole = adminRole;
-        emit RoleAdminChanged(role, previousAdminRole, adminRole);
-    }
-
-    function _grantRole(bytes32 role, address account)  override internal  {
-        if (!hasRole(role, account)) {
-            _approvers[role].members[account] = true;
-            emit RoleGranted(role, account, _msgSender());
-        }
-    }
-
-    function _revokeRole(bytes32 role, address account) override internal  {
-        if (hasRole(role, account)) {
-            _approvers[role].members[account] = false;
-            emit RoleRevoked(role, account, _msgSender());
-        }
-    }
+  function _setRoleAdmin(bytes32 daoUuid, bytes32 adminRole)  override internal  {
+      bytes32 previousAdminRole = getRoleAdmin(daoUuid);
+      _approvers[daoUuid].adminRole = adminRole;
+      emit RoleAdminChanged(daoUuid, previousAdminRole, adminRole);
+  }
   // For future extensions
   uint256[50] private ______gap;
 }
